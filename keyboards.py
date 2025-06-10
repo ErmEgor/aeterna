@@ -123,8 +123,11 @@ def get_my_bookings_kb(bookings):
 admin_main_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📋 Записи на день", callback_data="admin_view_bookings")],
     [InlineKeyboardButton(text="🗓️ Управление слотами", callback_data="admin_manage_slots")],
-    [InlineKeyboardButton(text="✍️ Записать клиента", callback_data="admin_manual_booking_start")]
+    [InlineKeyboardButton(text="✍️ Записать клиента", callback_data="admin_manual_booking_start")],
+    # <-- НОВАЯ КНОПКА ВЫХОДА -->
+    [InlineKeyboardButton(text="🚪 Выйти в главное меню", callback_data="to_main_menu")] 
 ])
+
 
 admin_manage_slots_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="➕ Добавить слот", callback_data="admin_add_slot")],
