@@ -5,6 +5,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
 import calendar
 
+# <-- НОВЫЙ СПИСОК МЕСЯЦЕВ -->
+# Список для заголовков календаря (Именительный падеж)
+RUSSIAN_MONTHS = [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+]
+
 # --- Главное меню ---
 main_menu_kb = ReplyKeyboardMarkup(
     keyboard=[
@@ -45,9 +52,11 @@ def create_calendar_kb(year=None, month=None, prefix="date"):
 
     builder = InlineKeyboardBuilder()
     
+    # <-- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем наш список вместо системного -->
+    month_name = RUSSIAN_MONTHS[month - 1]
     builder.row(
         InlineKeyboardButton(text=" ", callback_data="ignore"),
-        InlineKeyboardButton(text=f"{calendar.month_name[month]} {year}", callback_data="ignore"),
+        InlineKeyboardButton(text=f"{month_name} {year}", callback_data="ignore"),
         InlineKeyboardButton(text=" ", callback_data="ignore")
     )
     days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -67,7 +76,6 @@ def create_calendar_kb(year=None, month=None, prefix="date"):
                     row_buttons.append(InlineKeyboardButton(text=str(day), callback_data=f"{prefix}:{current_date.strftime('%Y-%m-%d')}"))
         builder.row(*row_buttons)
 
-    # Кнопки навигации
     nav_callback_prefix = prefix.replace('date', '')
     builder.row(
         InlineKeyboardButton(text="<", callback_data=f"{nav_callback_prefix}prev_month:{year}-{month}"),
@@ -76,7 +84,8 @@ def create_calendar_kb(year=None, month=None, prefix="date"):
     )
     return builder.as_markup()
 
-# --- Клавиатура для выбора времени ---
+# (остальной код файла keyboards.py остается без изменений)
+# ... (скопируйте сюда оставшуюся часть вашего файла keyboards.py)
 def get_time_slots_kb(available_slots, back_callback="back_to_calendar", prefix="time"):
     builder = InlineKeyboardBuilder()
     if not available_slots:
@@ -88,7 +97,6 @@ def get_time_slots_kb(available_slots, back_callback="back_to_calendar", prefix=
     builder.adjust(4)
     return builder.as_markup()
     
-# --- Клавиатура подтверждения записи ---
 def get_confirmation_kb(prefix=""):
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -97,7 +105,6 @@ def get_confirmation_kb(prefix=""):
         ]
     )
 
-# --- Клавиатура для "Мои записи" ---
 def get_my_bookings_kb(bookings):
     builder = InlineKeyboardBuilder()
     if not bookings:
@@ -112,10 +119,6 @@ def get_my_bookings_kb(bookings):
     builder.button(text="◀️ Назад в меню", callback_data="to_main_menu")
     builder.adjust(1)
     return builder.as_markup()
-
-# ==================================
-#         АДМИН КЛАВИАТУРЫ
-# ==================================
 
 admin_main_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📋 Записи на день", callback_data="admin_view_bookings")],
