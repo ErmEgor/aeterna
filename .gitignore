@@ -1,0 +1,24 @@
+# Файл .env с секретными данными
+.env
+
+# Файл базы данных SQLite
+bookings.db
+*.db
+*.sqlite3
+
+# Папки с кэшем Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Папки виртуального окружения
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Файлы и папки IDE
+.idea/
+.vscode/
