@@ -94,7 +94,7 @@ async def main():
 
     logging.info(f"Сервер запущен на http://{WEB_SERVER_HOST}:{WEB_SERVER_PORT}")
 
-    # Бесконечный цикл для поддержания работы приложения
+    # Бесконечный цикл для поддержания работы приложения3
     await asyncio.Event().wait()
 
 
