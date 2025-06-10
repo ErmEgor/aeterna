@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-import os # <-- Удалили locale
+import os
 
 from aiohttp import web
 
@@ -10,12 +10,13 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+# --- НОВЫЕ ИМПОРТЫ для меню ---
+from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 
-from config import BOT_TOKEN
+# --- ВАЖНО: Импортируем ADMIN_IDS из config.py ---
+from config import BOT_TOKEN, ADMIN_IDS
 from handlers import router
 from database import init_db
-
-# <-- УДАЛЕН БЛОК С LOCALE.SETLOCALE -->
 
 # --- Настройки логгирования ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
@@ -26,8 +27,34 @@ WEB_SERVER_PORT = int(os.getenv("WEB_SERVER_PORT", 10000))
 BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
-# Путь для вебхука, по которому Telegram будет присылать обновления
+# Путь для вебхука
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+
+
+# --- НОВАЯ ФУНКЦИЯ: Установка меню команд ---
+async def set_bot_commands(bot: Bot):
+    """
+    Создает и устанавливает меню с командами для разных ролей пользователей.
+    """
+    # Команды для обычных пользователей
+    user_commands = [
+        BotCommand(command="/start", description="🚀 Начать заново / Главное меню")
+    ]
+    # Команды для администраторов (включают все пользовательские + админские)
+    admin_commands = user_commands + [
+        BotCommand(command="/admin", description="⚙️ Админ-панель")
+    ]
+
+    # Устанавливаем команды по умолчанию для всех пользователей
+    await bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
+
+    # Устанавливаем расширенные команды для каждого администратора
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+        except Exception as e:
+            logging.error(f"Не удалось установить команды для админа {admin_id}: {e}")
+    logging.info("Меню команд успешно настроено.")
 
 
 # --- Функции жизненного цикла: запуск и остановка ---
@@ -36,9 +63,14 @@ async def on_startup(bot: Bot) -> None:
         logging.error("BASE_WEBHOOK_URL не задан в переменных окружения!")
         return
 
+    # Устанавливаем меню команд
+    await set_bot_commands(bot)
+
+    # Устанавливаем вебхук
     webhook_url = f"{BASE_WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"
     await bot.set_webhook(url=webhook_url, secret_token=WEBHOOK_SECRET)
     logging.info(f"Вебхук установлен на URL: {webhook_url}")
+
 
 async def on_shutdown(bot: Bot) -> None:
     await bot.delete_webhook()
