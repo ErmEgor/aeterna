@@ -40,7 +40,15 @@ def get_services_kb(services, prefix="service"):
             text=f"{service_info['name']} ({service_info['price']} руб.)",
             callback_data=f"{prefix}:{service_id}"
         )
-    builder.button(text="◀️ Назад", callback_data="to_main_menu")
+    
+    # <<< ИСПРАВЛЕНИЕ ЗДЕСЬ >>>
+    # Определяем, куда будет вести кнопка "Назад", в зависимости от префикса
+    if prefix.startswith("admin"):
+        back_callback = "admin_panel"
+    else:
+        back_callback = "to_main_menu"
+        
+    builder.button(text="◀️ Назад", callback_data=back_callback)
     builder.adjust(1)
     return builder.as_markup()
 
@@ -69,13 +77,11 @@ def create_calendar_kb(year=None, month=None, prefix="date"):
             else:
                 current_date = datetime(year, month, day).date()
                 if current_date < datetime.now().date():
-                    # (### ИЗМЕНЕНИЕ 1 ###) Отправляем специальный колбэк для прошедших дат
                     row_buttons.append(InlineKeyboardButton(text=str(day), callback_data="past_date"))
                 else:
                     row_buttons.append(InlineKeyboardButton(text=str(day), callback_data=f"{prefix}:{current_date.strftime('%Y-%m-%d')}"))
         builder.row(*row_buttons)
 
-    # (### ИЗМЕНЕНИЕ 2 ###) Делаем кнопку "Назад" умной, чтобы она вела в нужное меню
     if prefix.startswith("admin"):
         back_callback = "admin_panel"
     else:
