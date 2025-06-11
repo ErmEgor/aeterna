@@ -5,7 +5,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timedelta
 import calendar
 
-# <-- НОВЫЙ СПИСОК МЕСЯЦЕВ -->
 # Список для заголовков календаря (Именительный падеж)
 RUSSIAN_MONTHS = [
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -52,7 +51,6 @@ def create_calendar_kb(year=None, month=None, prefix="date"):
 
     builder = InlineKeyboardBuilder()
     
-    # <-- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем наш список вместо системного -->
     month_name = RUSSIAN_MONTHS[month - 1]
     builder.row(
         InlineKeyboardButton(text=" ", callback_data="ignore"),
@@ -71,21 +69,26 @@ def create_calendar_kb(year=None, month=None, prefix="date"):
             else:
                 current_date = datetime(year, month, day).date()
                 if current_date < datetime.now().date():
-                    row_buttons.append(InlineKeyboardButton(text=str(day), callback_data="ignore"))
+                    # (### ИЗМЕНЕНИЕ 1 ###) Отправляем специальный колбэк для прошедших дат
+                    row_buttons.append(InlineKeyboardButton(text=str(day), callback_data="past_date"))
                 else:
                     row_buttons.append(InlineKeyboardButton(text=str(day), callback_data=f"{prefix}:{current_date.strftime('%Y-%m-%d')}"))
         builder.row(*row_buttons)
 
+    # (### ИЗМЕНЕНИЕ 2 ###) Делаем кнопку "Назад" умной, чтобы она вела в нужное меню
+    if prefix.startswith("admin"):
+        back_callback = "admin_panel"
+    else:
+        back_callback = "back_to_services"
+        
     nav_callback_prefix = prefix.replace('date', '')
     builder.row(
         InlineKeyboardButton(text="<", callback_data=f"{nav_callback_prefix}prev_month:{year}-{month}"),
-        InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_services"),
+        InlineKeyboardButton(text="◀️ Назад", callback_data=back_callback),
         InlineKeyboardButton(text=">", callback_data=f"{nav_callback_prefix}next_month:{year}-{month}")
     )
     return builder.as_markup()
 
-# (остальной код файла keyboards.py остается без изменений)
-# ... (скопируйте сюда оставшуюся часть вашего файла keyboards.py)
 def get_time_slots_kb(available_slots, back_callback="back_to_calendar", prefix="time"):
     builder = InlineKeyboardBuilder()
     if not available_slots:
@@ -124,7 +127,6 @@ admin_main_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📋 Записи на день", callback_data="admin_view_bookings")],
     [InlineKeyboardButton(text="🗓️ Управление слотами", callback_data="admin_manage_slots")],
     [InlineKeyboardButton(text="✍️ Записать клиента", callback_data="admin_manual_booking_start")],
-    # <-- НОВАЯ КНОПКА ВЫХОДА -->
     [InlineKeyboardButton(text="🚪 Выйти в главное меню", callback_data="to_main_menu")] 
 ])
 

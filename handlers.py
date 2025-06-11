@@ -16,7 +16,6 @@ from config import ADMIN_IDS, SERVICES, WORK_HOURS
 
 router = Router()
 
-# <-- НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ -->
 def format_date_russian(dt_obj):
     """Форматирует дату в красивый русский формат (e.g., '20 июня 2025 г.')"""
     months = [
@@ -25,11 +24,9 @@ def format_date_russian(dt_obj):
     ]
     return f"{dt_obj.day} {months[dt_obj.month - 1]} {dt_obj.year} г."
 
-
 # ================================================
 #          МАШИНА СОСТОЯНИЙ (FSM)
 # ================================================
-
 class Booking(StatesGroup):
     choosing_service = State()
     choosing_date = State()
@@ -52,7 +49,6 @@ class Admin(StatesGroup):
 # ================================================
 #          ОБЩИЕ ХЕНДЛЕРЫ
 # ================================================
-
 @router.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
@@ -63,24 +59,33 @@ async def cmd_start(message: Message, state: FSMContext):
         reply_markup=kb.main_menu_kb
     )
 
+# (### ИЗМЕНЕНИЕ 1 ###) Новая функция для лаконичного возврата в меню
+async def show_main_menu(message: Message, state: FSMContext):
+    """Отображает главное меню без приветственного текста."""
+    await state.clear()
+    await message.answer(
+        "Вы вернулись в главное меню. Выберите действие:",
+        reply_markup=kb.main_menu_kb
+    )
+
 @router.callback_query(F.data == "cancel_process")
 async def cancel_process(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text("Действие отменено. Вы вернулись в главное меню.")
-    await callback.message.answer("Выберите действие:", reply_markup=kb.main_menu_kb)
+    # (### ИЗМЕНЕНИЕ 2 ###) Используем новую функцию
+    await callback.message.edit_text("Действие отменено.")
+    await show_main_menu(callback.message, state)
     await callback.answer()
 
 @router.callback_query(F.data == "to_main_menu")
 async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.message.edit_text("Вы вернулись в главное меню.")
-    await cmd_start(callback.message, state)
+    # (### ИЗМЕНЕНИЕ 3 ###) Удаляем старое сообщение и используем новую функцию
+    await callback.message.delete()
+    await show_main_menu(callback.message, state)
     await callback.answer()
     
 # ================================================
 #          ПОЛЬЗОВАТЕЛЬСКИЙ СЦЕНАРИЙ
 # ================================================
-
 @router.message(F.text == "📅 Записаться")
 async def process_booking(message: Message, state: FSMContext):
     await state.set_state(Booking.choosing_service)
@@ -91,18 +96,13 @@ async def process_my_bookings(message: Message):
     bookings = db.get_user_bookings(message.from_user.id)
     await message.answer("Ваши активные записи:", reply_markup=kb.get_my_bookings_kb(bookings))
 
-# handlers.py
-
-# ... (найдите эту функцию в вашем файле)
-
 @router.message(F.text == "ℹ️ О нас")
 async def process_about(message: Message):
-    # <-- ЗАМЕНИТЕ СТАРЫЙ ТЕКСТ НА ЭТОТ БЛОК -->
     about_text = """
 Добро пожаловать в <b>Студию красоты "Aeterna"</b>!
 <i>Место, где ваша красота становится вечной.</i>
 
-Мы рады предложить вам первоклассный сервис и уютную атмосферу, в которой вы сможете по-настоящему расслабиться.
+Мы рады предложить вам первоклассный сервис и уютную атмосферу, в которой вы сможете по-настояшему расслабиться.
 
 <b>Наши преимущества:</b>
 ✨ <b>Профессионализм:</b> Наши мастера — сертифицированные специалисты с многолетним опытом.
@@ -124,8 +124,6 @@ async def process_about(message: Message):
 """
     await message.answer(about_text, reply_markup=kb.about_kb)
 
-# ... (остальной код файла остается без изменений)
-
 # --- Шаги записи ---
 @router.callback_query(StateFilter(Booking.choosing_service, Admin.manual_booking_service), F.data.startswith(("service:", "admin_service:")))
 async def process_service_choice(callback: CallbackQuery, state: FSMContext):
@@ -143,11 +141,19 @@ async def process_service_choice(callback: CallbackQuery, state: FSMContext):
     )
     await callback.answer()
 
+# (### ИЗМЕНЕНИЕ 4 ###) Новый обработчик для нажатий на прошедшие даты
+@router.callback_query(StateFilter('*'), F.data == "past_date")
+async def process_past_date_press(callback: CallbackQuery):
+    await callback.answer(
+        "Эта дата уже прошла. Пожалуйста, выберите доступную дату.",
+        show_alert=True
+    )
+
 @router.callback_query(StateFilter(Booking.choosing_date, Admin.manual_booking_date), F.data.startswith(("date:", "admin_date:")))
 async def process_date_choice(callback: CallbackQuery, state: FSMContext):
     is_admin = callback.data.startswith("admin_")
     prefix = "admin_" if is_admin else ""
-    date_str = callback.data.split(":")[1]
+    date_str = callback.data.partition(":")[2]
     await state.update_data(chosen_date=date_str)
     
     user_data = await state.get_data()
@@ -184,11 +190,13 @@ async def process_date_choice(callback: CallbackQuery, state: FSMContext):
         f"Доступное время на <b>{format_date_russian(date_obj)}</b>:",
         reply_markup=kb.get_time_slots_kb(
             available_slots, 
-            back_callback="admin_manual_booking_start" if is_admin else "back_to_services",
+            back_callback="admin_panel" if is_admin else "back_to_services",
             prefix=f"{prefix}time"
         )
     )
     await callback.answer()
+
+# ... (остальной код до админ-панели остается без изменений) ...
 
 @router.callback_query(StateFilter(Booking.choosing_time, Admin.manual_booking_time), F.data.startswith(("time:", "admin_time:")))
 async def process_time_choice(callback: CallbackQuery, state: FSMContext):
@@ -323,11 +331,13 @@ async def admin_panel_callback(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(Admin.panel, F.data == "admin_view_bookings")
 async def admin_view_bookings(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Admin.choosing_date_for_view)
-    await callback.message.edit_text("Выберите дату для просмотра записей:", reply_markup=kb.create_calendar_kb())
+    # (### ИЗМЕНЕНИЕ 5 ###) Передаем админский префикс
+    await callback.message.edit_text("Выберите дату для просмотра записей:", reply_markup=kb.create_calendar_kb(prefix="admin_date"))
 
-@router.callback_query(Admin.choosing_date_for_view, F.data.startswith("date:"))
+# (### ИЗМЕНЕНИЕ 6 ###) Обрабатываем админский префикс
+@router.callback_query(Admin.choosing_date_for_view, F.data.startswith("admin_date:"))
 async def admin_show_daily_bookings(callback: CallbackQuery, state: FSMContext):
-    date_str = callback.data.split(":")[1]
+    date_str = callback.data.partition(":")[2]
     bookings = db.get_daily_bookings(date_str)
     
     date_obj = datetime.strptime(date_str, '%Y-%m-%d')
@@ -343,9 +353,6 @@ async def admin_show_daily_bookings(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(response_text, reply_markup=kb.admin_back_kb)
     await state.set_state(Admin.panel)
 
-# (остальной код админ-панели остается без изменений)
-
-# ... (скопируйте сюда оставшуюся часть вашего файла handlers.py без изменений)
 # --- Управление слотами ---
 @router.callback_query(Admin.panel, F.data == "admin_manage_slots")
 async def admin_manage_slots(callback: CallbackQuery):
@@ -355,11 +362,13 @@ async def admin_manage_slots(callback: CallbackQuery):
 @router.callback_query(Admin.panel, F.data == "admin_add_slot")
 async def admin_add_slot_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Admin.choosing_date_for_add)
-    await callback.message.edit_text("Выберите дату для добавления слота:", reply_markup=kb.create_calendar_kb())
+    # (### ИЗМЕНЕНИЕ 7 ###) Передаем админский префикс
+    await callback.message.edit_text("Выберите дату для добавления слота:", reply_markup=kb.create_calendar_kb(prefix="admin_date"))
 
-@router.callback_query(Admin.choosing_date_for_add, F.data.startswith("date:"))
+# (### ИЗМЕНЕНИЕ 8 ###) Обрабатываем админский префикс
+@router.callback_query(Admin.choosing_date_for_add, F.data.startswith("admin_date:"))
 async def admin_add_slot_date(callback: CallbackQuery, state: FSMContext):
-    date_str = callback.data.split(":")[1]
+    date_str = callback.data.partition(":")[2]
     await state.update_data(admin_chosen_date=date_str)
     await state.set_state(Admin.choosing_time_for_add)
     await callback.message.edit_text("Введите время для нового слота в формате ЧЧ:ММ (например, 14:30).")
@@ -380,11 +389,13 @@ async def admin_add_slot_time(message: Message, state: FSMContext):
 @router.callback_query(Admin.panel, F.data == "admin_remove_slot_start")
 async def admin_remove_slot_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Admin.choosing_date_for_remove)
-    await callback.message.edit_text("Выберите дату для удаления слота:", reply_markup=kb.create_calendar_kb())
+    # (### ИЗМЕНЕНИЕ 9 ###) Передаем админский префикс
+    await callback.message.edit_text("Выберите дату для удаления слота:", reply_markup=kb.create_calendar_kb(prefix="admin_date"))
 
-@router.callback_query(Admin.choosing_date_for_remove, F.data.startswith("date:"))
+# (### ИЗМЕНЕНИЕ 10 ###) Обрабатываем админский префикс
+@router.callback_query(Admin.choosing_date_for_remove, F.data.startswith("admin_date:"))
 async def admin_remove_slot_date(callback: CallbackQuery, state: FSMContext):
-    date_str = callback.data.split(":")[1]
+    date_str = callback.data.partition(":")[2]
     slots_for_removal = db.get_admin_slots(date_str)
     await callback.message.edit_text(
         f"Выберите слот для удаления на {format_date_russian(datetime.strptime(date_str, '%Y-%m-%d'))}:",
